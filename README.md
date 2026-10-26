@@ -139,7 +139,7 @@ Contoh alternatif untuk **MQTT over WebSocket** juga sudah tersedia di komentar 
 ---
 
 ## Tangkapan Layar
-
+<img width="1902" height="1102" alt="image" src="https://github.com/user-attachments/assets/91db2f02-b8b5-4c38-b132-5f51810d0d88" />
 <!-- Tambahkan screenshot setelah repo dibuat, contoh:
 ![Panel monitoring](screenshot.png)
 -->
