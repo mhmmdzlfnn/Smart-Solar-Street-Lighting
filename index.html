@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Monitoring — Smart Solar Street Lighting</title>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar" id="topbar">
+  <div class="brand">
+    <h1>Smart Solar Street Lighting</h1>
+    <span class="sub">Panel Monitoring Lampu Jalan — Unit 1</span>
+  </div>
+  <div class="topstatus">
+    <span id="netBadge" class="badge offline"><span class="dot"></span><span id="netText">ESP32 Offline</span></span>
+    <div class="clock">
+      <span class="clock-label">Update Terakhir</span>
+      <b id="lastUpdate" class="clock-time">—</b>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 01 MONITORING ============ -->
+  <div class="section-head"><span class="idx">01</span><span>Monitoring Langsung</span></div>
+
+  <!-- Status lampu: kartu terbesar -->
+  <section class="card lamp-card st-off" id="lampCard">
+    <div class="card-label">Lampu Jalan <span class="gpio">LED • PWM GPIO25</span></div>
+    <div class="lamp-row">
+      <div class="lamp-state" aria-live="polite"><span class="led"></span><span id="lampState">—</span></div>
+      <div class="lamp-pct"><span id="lampPct">—</span><span class="unit">%</span></div>
+    </div>
+    <div class="bar"><div id="lampBar"></div></div>
+    <div class="bar-scale"><span>0%</span><span>50%</span><span>100% kecerahan</span></div>
+    <div class="lamp-meta"><span id="chipControl" class="chip neutral">Kontrol: —</span></div>
+  </section>
+
+  <!-- LDR, PIR, Baterai -->
+  <div class="grid3">
+    <section class="card">
+      <div class="card-label">Kondisi Cahaya <span class="gpio">LDR • GPIO34</span></div>
+      <div class="big-value"><span id="ldrRaw">—</span><span class="unit">ADC</span></div>
+      <div class="card-line">
+        <span id="chipLdr" class="chip neutral">—</span>
+        <span>Mode sistem: <b id="sysMode">—</b></span>
+      </div>
+      <div class="note">Skala 0–4095 • ambang gelap &lt; 2000</div>
+    </section>
+
+    <section class="card">
+      <div class="card-label">Gerakan <span class="gpio">PIR • GPIO27</span></div>
+      <div class="big-value txt" id="pirState">—</div>
+      <div class="card-line">Gerakan terakhir: <b id="pirLast">—</b></div>
+      <div class="note" id="pirAgo">&nbsp;</div>
+    </section>
+
+    <section class="card" id="battCard">
+      <div class="card-label">Tegangan Baterai <span class="gpio">GPIO35 • pembagi tegangan</span></div>
+      <div class="big-value"><span id="battV">—</span><span class="unit">volt</span></div>
+      <div class="card-line"><span id="chipBatt" class="chip neutral">—</span></div>
+      <div class="note">Rendah &lt; 11,8 V • mengisi ≥ 13,0 V</div>
+    </section>
+  </div>
+
+  <!-- Grafik riwayat + log kejadian -->
+  <div class="row2">
+    <section class="card">
+      <div class="card-label">Grafik Riwayat <span class="gpio" id="chartNote">—</span></div>
+      <div class="legend">
+        <span><i class="sw ldr"></i>LDR (ADC, sumbu kanan)</span>
+        <span><i class="sw bright"></i>Kecerahan lampu (%, sumbu kiri)</span>
+        <span><i class="sw motion"></i>Gerakan terdeteksi</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart"></canvas>
+        <div id="tooltip"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-label">Log Kejadian <span class="gpio">terbaru di atas</span></div>
+      <ul class="log-list" id="logList">
+        <li><span class="muted">Belum ada data.</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- Ringkasan hemat energi -->
+  <section class="card">
+    <div class="card-label">Ringkasan Hemat Energi <span class="gpio">sejak senja • dibanding menyala 100% terus</span></div>
+    <div class="energy-grid">
+      <div><div class="e-val" id="eDim">—</div><div class="e-lab">Durasi lampu redup</div></div>
+      <div><div class="e-val" id="eBright">—</div><div class="e-lab">Durasi lampu terang</div></div>
+      <div><div class="e-val" id="eOff">—</div><div class="e-lab">Durasi lampu mati (malam)</div></div>
+      <div><div class="e-val green" id="eSave">—</div><div class="e-lab">Estimasi penghematan</div></div>
+    </div>
+    <div class="note" id="eNote">&nbsp;</div>
+  </section>
+
+  <!-- ============ 02 PANEL KONTROL (terpisah dari monitoring) ============ -->
+  <div class="section-head"><span class="idx">02</span><span>Panel Kontrol</span></div>
+
+  <section class="card control" id="controlCard">
+    <div class="manual-banner hidden" id="banner">
+      MODE MANUAL AKTIF — logika otomatis (LDR/PIR) dinonaktifkan. Lampu dikendalikan penuh oleh teknisi.
+    </div>
+
+    <div class="control-grid">
+      <div>
+        <div class="ctl-title">Mode Kontrol</div>
+        <div class="seg" role="group" aria-label="Pilih mode kontrol">
+          <button class="seg-btn active" id="btnAuto">Otomatis</button>
+          <button class="seg-btn" id="btnManual">Manual</button>
+        </div>
+        <div class="ctl-note">
+          Saat otomatis: siang = mati, malam tanpa gerakan = redup 30%,
+          ada gerakan = terang 100%, kembali redup setelah 15 detik tanpa gerakan.
+        </div>
+      </div>
+
+      <div class="manual-ctl disabled" id="manualCtl">
+        <div class="ctl-title">Kontrol Manual</div>
+        <button class="btn-toggle" id="btnLamp" disabled>Nyalakan</button>
+        <div class="slider-row">
+          <input type="range" id="slider" min="0" max="100" step="1" value="30" disabled aria-label="Kecerahan lampu manual">
+          <span class="slider-val" id="sliderVal">30%</span>
+        </div>
+        <div class="ctl-note">Slider mengatur kecerahan 0–100% saat mode manual.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    Mode preview: data dummy dari <b>dummy-data.js</b>.
+    Untuk data asli, isi fungsi <b>fetchData()</b> dan <b>sendControl()</b> di <b>app.js</b> (bagian GANTI DI SINI).
+  </div>
+</main>
+
+<noscript><div style="padding:20px;color:#ef5350">Halaman ini membutuhkan JavaScript.</div></noscript>
+
+<script src="config.js"></script>
+<script src="dummy-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
